@@ -1,0 +1,135 @@
+import org.openqa.selenium.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import javax.swing.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Timesheet {
+
+    List<File> timesheet = new ArrayList<>();
+
+    public static void main(String[] args) {
+        Timesheet timesheet = new Timesheet();
+
+        System.setProperty("webdriver.chrome.driver", "C:\\Users\\a692361\\development\\chromedriver.exe");
+        ChromeOptions chromeOptions = new ChromeOptions();
+        chromeOptions.addArguments("--incognito");
+        chromeOptions.addArguments("--disable-dev-shm-usage");
+        DesiredCapabilities capabilities = DesiredCapabilities.chrome();
+        capabilities.setCapability(ChromeOptions.CAPABILITY, chromeOptions);
+        WebDriver driver=new ChromeDriver(capabilities);
+        driver.manage().window().maximize();
+
+        driver.get("https://www.fieldglass.net/time_sheet_list.do?cf=1");
+
+        timesheet.login(driver);
+        timesheet.search(driver);
+        timesheet.send(driver);
+
+    }
+
+    private void send(WebDriver driver) {
+        WebElement element = null;
+        String date = driver.findElement(By.xpath("//*[@id='row0timeSheet_worker_list']/div[7]")).getText().trim();
+        LocalDate localDate = StringToLocalDate(date);
+        driver.get("https://www.cognitoforms.com/SVSTechnologiesLimited/Timesheet");
+        new WebDriverWait(driver, 10).until(ExpectedConditions.presenceOfElementLocated(By.id("c-0-11")));
+        element = driver.findElement(By.id("c-0-11"));
+        element.sendKeys("Raswanth");
+        element = driver.findElement(By.id("c-1-11"));
+        element.sendKeys("Balasuntharam");
+        element = driver.findElement(By.id("c-3-10"));
+        element.sendKeys(localDate.getMonth().toString());
+        element = driver.findElement(By.id("c-4-9"));
+        element.clear();
+        element.sendKeys(date);
+        element.click();
+        String uploadFiles = "";
+        for(File f : timesheet){
+            uploadFiles = uploadFiles + f.getAbsolutePath();
+            if(timesheet.indexOf(f) + 1 < timesheet.size()){
+                uploadFiles = uploadFiles + "\n";
+            }
+        }
+        element = driver.findElement(By.name("file"));
+        element.sendKeys(uploadFiles);
+
+    }
+
+    private void search(WebDriver driver) {
+        WebElement element = null;
+        new WebDriverWait(driver, 10).until(ExpectedConditions.presenceOfElementLocated(By.xpath("//*[@id='row0timeSheet_worker_list']/div[2]/div/a")));
+        String countStr = JOptionPane.showInputDialog("Choose number of timecards");
+        int count = Integer.parseInt(countStr);
+        for(int i=1; i<count; i++){
+            String status_path = String.format("//*[@id='row%dtimeSheet_worker_list']/div[1]/div", i);
+            String status = driver.findElement(By.xpath(status_path)).getText().trim();
+            String link_path = String.format("//*[@id='row%dtimeSheet_worker_list']/div[2]/div/a", i);
+            if(status.equals("Approved")){
+                driver.findElement(By.xpath(link_path)).click();
+                new WebDriverWait(driver, 10).until(ExpectedConditions.presenceOfElementLocated(By.className("iconSvg")));
+                String dateStr = driver.findElement(By.xpath("//*[@id='timeSheetBadge']/ul[2]/li[3]/div[2]")).getText().trim();
+                String[] dateArr = dateStr.split(" to ");
+                String startDate = dateArr[0];
+                String endDate = dateArr[1];
+                takeScreeshot(driver, startDate, endDate);
+                driver.findElement(By.xpath("//*[@id='timeSheetBadge']/ul[1]/li/a/div")).click();
+                new WebDriverWait(driver, 10).until(ExpectedConditions.presenceOfElementLocated(By.xpath("//*[@id='row0timeSheet_worker_list']/div[2]/div/a")));
+
+            }
+        }
+        JOptionPane.showMessageDialog(null, timesheet.size() + " timesheets captured");
+    }
+
+    private void takeScreeshot(WebDriver driver, String startDate, String endDate) {
+        LocalDate sDate = StringToLocalDate(startDate);
+        LocalDate eDate = StringToLocalDate(endDate);
+        File file = new File("C:\\Users\\a692361\\Documents\\raswanth\\Timesheet\\" + sDate.getMonth() +" "+sDate.getDayOfMonth() +" "+ sDate.getYear() +" - "+ eDate.getMonth() +" "+eDate.getDayOfMonth() +" "+ eDate.getYear() +".png");
+        if(file.exists()){
+            file.delete();
+        }
+        TakesScreenshot screenshot = (TakesScreenshot) driver;
+        File srcFile = screenshot.getScreenshotAs(OutputType.FILE);
+        try {
+            Files.copy(srcFile.toPath(), file.toPath());
+            timesheet.add(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private LocalDate StringToLocalDate(String date) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+        LocalDate localDate = null;
+        try{
+            localDate = LocalDate.parse(date, formatter);
+        } catch (DateTimeParseException e){
+            e.printStackTrace();
+        }
+        return localDate;
+    }
+
+
+    public void login(WebDriver driver){
+        WebElement element = null;
+        element = new WebDriverWait(driver, 10).until(ExpectedConditions.presenceOfElementLocated(By.id("usernameId_new")));
+        element = driver.findElement(By.id("usernameId_new"));
+        element.sendKeys("fmrwk00024413");
+        element = driver.findElement(By.id("passwordId_new"));
+        element.sendKeys("ras@Field5077!");
+        driver.findElement(By.className("formLoginButton_new")).click();
+    }
+
+}
